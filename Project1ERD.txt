@@ -1,0 +1,53 @@
+[Employees](eid*, name, gender, dob, title, salary);
+[Facilities](fid*, address, postalCode);
+[Customers](cid*, name, gender, phoneNumber);
+[DeliveryRequests](drid*, pickupAddress, pickupPostal, recipientName, recipientAddress, recipientPostal, status);
+[[Packages]](pid*, userDimensions(height, width, depth), actualDimensions(height, width, depth), weight, desc, value);
+[Payments](creditCardNumber, paymentTimestamp);
+[[DeliveryProcesses]](src*, dest*, startTime*, endTime*, isReturn);
+[[Unsuccessful]](timestamp*, reason);
+[[Legs]](lid*);
+
+<Cancels>(timestamp, facility);
+Customers --- Cancels;
+DeliveryRequests --> Cancels;
+
+<Submits>();
+Customers --- Submits;
+DeliveryRequests ==> Submits;
+
+<Transfers>();
+DeliveryProcesses --> Transfers;
+Facilities --> Transfers;
+
+<<Consists>>();
+Legs ==> Consists;
+DeliveryProcesses --- Consists;
+
+<<Is>>();
+Unsuccessful ==> Is;
+DeliveryProcesses --- Is;
+
+<<Involves>>();
+Packages ==> Involves;
+DeliveryRequests === Involves; 
+
+<Processes>(price, pickupDate, estimatedDays);
+DeliveryRequests ==> Processes;
+Employees --- Processes;
+
+<Accepts>();
+Payments ==> Accepts;
+DeliveryRequests --> Accepts;
+
+<Monitors>();
+Employees --- Monitors;
+DeliveryProcesses ==> Monitors;
+
+<Delivers>();
+DeliveryProcesses ==> Delivers;
+Employees --- Delivers;
+
+<<Handles>>();
+DeliveryProcesses ==> Handles;
+DeliveryRequests --- Handles;
