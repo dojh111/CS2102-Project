@@ -1,6 +1,5 @@
-DROP TYPE IF EXISTS gender_t, request_status_t CASCADE;
-
-DROP TABLE IF EXISTS Customers, DeliveryRequests, Cancels, AcceptsPayments, InvolvesPackages, Employees, DeliveryProcesses, Facilities, ConsistsLegs, IsUnsuccessful CASCADE;
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
 
 CREATE TYPE gender_t AS enum ('M', 'F');
 CREATE TYPE request_status_t AS enum ('Completed', 'Cancelled', 'Unsuccessful');
@@ -21,6 +20,18 @@ CREATE TABLE Employees (
   salary NUMERIC NOT NULL
 );
 
+CREATE TABLE MonitoringPersonnel (
+  eid INT PRIMARY KEY REFERENCES Employees(eid)
+);
+
+CREATE TABLE ProcessingPersonnel (
+  eid INT PRIMARY KEY REFERENCES Employees(eid)
+);
+
+CREATE TABLE DeliveryPersonnel (
+  eid INT PRIMARY KEY REFERENCES Employees(eid)
+);
+
 CREATE TABLE DeliveryRequests(
   drid INT PRIMARY KEY,
   status request_status_t,
@@ -33,12 +44,12 @@ CREATE TABLE DeliveryRequests(
   price NUMERIC,
   estimatedDays INT,
   cid INT NOT NULL REFERENCES Customers(cid),
-  eid INT NOT NULL REFERENCES Employees(eid)
+  processEid INT NOT NULL REFERENCES ProcessingPersonnel (eid)
 );
 
 -- Need to test by inserting DR without payment
 CREATE TABLE AcceptsPayments(
-  drid INT REFERENCES DeliveryRequests(drid), 
+  drid INT UNIQUE REFERENCES DeliveryRequests(drid), 
   creditCardNumber INT,
   paymentTimestamp TIMESTAMP, 
   PRIMARY KEY (drid, creditCardNumber, paymentTimestamp)
@@ -60,15 +71,15 @@ CREATE TABLE InvolvesPackages(
 );
 
 CREATE TABLE DeliveryProcesses (
-  src VARCHAR,
-  dest VARCHAR,
+  src INT,
+  dest INT,
   startTime TIMESTAMP,
   endTime TIMESTAMP,
   isReturn BOOLEAN,
   drid INT REFERENCES DeliveryRequests(drid) ON DELETE CASCADE,
-  deliveryEid INT NOT NULL REFERENCES Employees(eid),
-  monitorEid INT NOT NULL REFERENCES Employees(eid),
-  fid INT UNIQUE, 
+  deliveryEid INT NOT NULL REFERENCES DeliveryPersonnel(eid),
+  monitorEid INT NOT NULL REFERENCES MonitoringPersonnel(eid),
+  UNIQUE (drid, src, dest, startTime),
   PRIMARY KEY (drid, src, dest, startTime, endTime)
 );
 
@@ -76,35 +87,28 @@ CREATE TABLE Facilities (
   fid INT PRIMARY KEY,
   address VARCHAR,
   postalCode VARCHAR,
-  src VARCHAR,
-  dest VARCHAR,
-  startTime TIMESTAMP,
-  endTime TIMESTAMP,
-  drid INT,
-  UNIQUE(drid, src, dest, startTime, endTime),
-  CONSTRAINT fk_facilities FOREIGN KEY (drid, src, dest, startTime, endTime) REFERENCES DeliveryProcesses(drid, src, dest, startTime, endTime)
 );
 
-CREATE TABLE ConsistsLegs (
+CREATE TABLE Legs (
   lid INT,
-  src VARCHAR,
-  dest VARCHAR,
+  src INT,
+  dest INT,
   startTime TIMESTAMP,
   endTime TIMESTAMP,
   drid INT,
-  CONSTRAINT fk_facilities_consistslegs FOREIGN KEY (drid, src, dest, startTime, endTime) REFERENCES DeliveryProcesses(drid, src, dest, startTime, endTime) ON DELETE CASCADE,
+  CONSTRAINT fk_facilities_legs FOREIGN KEY (drid, src, dest, startTime, endTime) REFERENCES DeliveryProcesses(drid, src, dest, startTime, endTime) ON DELETE CASCADE,
   PRIMARY KEY (lid, drid, src, dest, startTime, endTime)
 );
 
-CREATE TABLE IsUnsuccessful (
+CREATE TABLE Unsuccessful (
   timestamp TIMESTAMP,
   reason VARCHAR,
-  src VARCHAR,
-  dest VARCHAR,
+  src INT,
+  dest INT,
   startTime TIMESTAMP,
   endTime TIMESTAMP,
   drid INT,
-  CONSTRAINT fk_facilities_isunsuccessful FOREIGN KEY (drid, src, dest, startTime, endTime) REFERENCES DeliveryProcesses(drid, src, dest, startTime, endTime) ON DELETE CASCADE,
+  CONSTRAINT fk_facilities_unsuccessful FOREIGN KEY (drid, src, dest, startTime, endTime) REFERENCES DeliveryProcesses(drid, src, dest, startTime, endTime) ON DELETE CASCADE,
   PRIMARY KEY (timestamp, drid, src, dest, startTime, endTime)
 );
 
@@ -114,7 +118,9 @@ CREATE TABLE Cancels (
   fid INT REFERENCES Facilities(fid),
   cid INT REFERENCES Customers(cid),
   drid INT REFERENCES DeliveryRequests(drid),
+  isRefund BOOLEAN NOT NULL DEFAULT FALSE,
   PRIMARY KEY (drid)
 );
 
-ALTER TABLE DeliveryProcesses ADD FOREIGN KEY (fid) REFERENCES Facilities(fid);
+ALTER TABLE DeliveryProcesses ADD FOREIGN KEY (src) REFERENCES Facilities (fid);
+ALTER TABLE DeliveryProcesses ADD FOREIGN KEY (dest) REFERENCES Facilities (fid);
