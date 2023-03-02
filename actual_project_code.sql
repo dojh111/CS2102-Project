@@ -1,8 +1,8 @@
 DROP SCHEMA public CASCADE;
-CREATE SCHEMA public;
+CREATE SCHEMA public; 
 
 CREATE TYPE gender_t AS enum ('M', 'F');
-CREATE TYPE request_status_t AS enum ('Completed', 'Cancelled', 'Unsuccessful');
+CREATE TYPE request_status_t AS enum ('Completed', 'Cancelled', 'Unsuccessful', 'Acceptable', 'Unacceptable', 'Accepted');
 
 CREATE TABLE Customers(
   cid INT PRIMARY KEY,
@@ -86,7 +86,7 @@ CREATE TABLE DeliveryProcesses (
 CREATE TABLE Facilities (
   fid INT PRIMARY KEY,
   address VARCHAR,
-  postalCode VARCHAR,
+  postalCode VARCHAR
 );
 
 CREATE TABLE Legs (
