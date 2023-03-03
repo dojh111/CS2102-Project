@@ -5,8 +5,8 @@
 [[Packages]](pid*, userDimensions(height, width, depth), actualDimensions(height, width, depth), weight, desc, value);
 [Payments](creditCardNumber*, paymentTimestamp*);
 [[DeliveryProcesses]](src*, dest*, startTime*, endTime*, isReturn);
-[Unsuccessful](timestamp*, reason);
-[Legs](lid*);
+[Unsuccessful](timestamp, reason);
+[Legs]();
 [DeliveryPersonnel]();
 [MonitoringPersonnel]();
 [ProcessingPersonnel]();

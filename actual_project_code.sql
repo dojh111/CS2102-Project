@@ -47,7 +47,6 @@ CREATE TABLE DeliveryRequests(
   processEid INT NOT NULL REFERENCES ProcessingPersonnel (eid)
 );
 
--- Need to test by inserting DR without payment
 CREATE TABLE AcceptsPayments(
   drid INT UNIQUE REFERENCES DeliveryRequests(drid), 
   creditCardNumber INT,
@@ -90,14 +89,13 @@ CREATE TABLE Facilities (
 );
 
 CREATE TABLE Legs (
-  lid INT,
   src INT,
   dest INT,
   startTime TIMESTAMP,
   endTime TIMESTAMP,
   drid INT,
   CONSTRAINT fk_facilities_legs FOREIGN KEY (drid, src, dest, startTime, endTime) REFERENCES DeliveryProcesses(drid, src, dest, startTime, endTime) ON DELETE CASCADE,
-  PRIMARY KEY (lid, drid, src, dest, startTime, endTime)
+  PRIMARY KEY (drid, src, dest, startTime, endTime)
 );
 
 CREATE TABLE Unsuccessful (
@@ -109,10 +107,9 @@ CREATE TABLE Unsuccessful (
   endTime TIMESTAMP,
   drid INT,
   CONSTRAINT fk_facilities_unsuccessful FOREIGN KEY (drid, src, dest, startTime, endTime) REFERENCES DeliveryProcesses(drid, src, dest, startTime, endTime) ON DELETE CASCADE,
-  PRIMARY KEY (timestamp, drid, src, dest, startTime, endTime)
+  PRIMARY KEY (drid, src, dest, startTime, endTime)
 );
 
--- Note that multiple parties (incl employee) can cancel the request
 CREATE TABLE Cancels (
   timestamp TIMESTAMP,
   fid INT REFERENCES Facilities(fid),
