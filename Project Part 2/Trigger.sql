@@ -297,4 +297,86 @@ BEFORE INSERT ON return_legs
 FOR EACH ROW
 EXECUTE FUNCTION override_return_leg_id();
 
+-----------------------------------------------------------------------------------------------------------------------------------
+-- Return_legs Q8
+-- Check that the trigger should go through if there is no cancellation requests
+CREATE OR REPLACE FUNCTION check_valid_first_return_leg() RETURNS TRIGGER
+AS $$
+DECLARE
+  last_leg_count INTEGER;
+  last_leg_end_time TIMESTAMP;
+  cancelled_time TIMESTAMP;
+BEGIN
+  SELECT COUNT(*) INTO last_leg_count FROM legs l WHERE l.request_id = NEW.reqest_id;
+  SELECT l.end_time INTO last_leg_end_time FROM legs l WHERE l.request_id = NEW.request_id;
+  SELECT cr.cancel_time INTO cancelled_time FROM cancelled_requests cr WHERE cr.id = NEW.request_id;
 
+  IF (last_leg_count < 1) THEN
+    RAISE EXCEPTION 'There is no existing leg for this delivery request!';
+    RETURN NULL;
+  END IF;
+
+  IF (last_leg_end_time IS NULL OR last_leg_end_time > NEW.start_time) THEN
+    RAISE EXCEPTION 'The start time of return leg cannot be earlier than the end time of the last leg!';
+    RETURN NULL;
+  END IF;
+
+  IF (cancelled_time < NEW.start_time) then
+    RAISE EXCEPTION 'The start time of return leg cannot be earlier than the cancellation time!';
+    RETURN NULL;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER check_valid_first_return_leg_trigger
+BEFORE INSERT ON return_legs
+FOR EACH ROW
+EXECUTE FUNCTION check_valid_first_return_leg();
+
+-----------------------------------------------------------------------------------------------------------------------------------
+-- Return_legs Q9
+CREATE OR REPLACE FUNCTION check_max_unsuccessful_return_deliveries() RETURNS TRIGGER
+AS $$
+DECLARE
+  urd_count INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO urd_count FROM unsuccessful_return_deliveries urd WHERE urd.request_id = NEW.request_id;
+
+  IF (urd_count >= 3) THEN
+    RAISE EXCEPTION 'Each delivery request can only have at most 3 unsuccessful return deliveries!';
+    RETURN NULL;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER check_max_unsuccessful_return_deliveries_trigger
+BEFORE INSERT ON unsuccessful_return_deliveries
+FOR EACH ROW
+EXECUTE FUNCTION check_max_unsuccessful_return_deliveries();
+
+-----------------------------------------------------------------------------------------------------------------------------------
+-- Unsuccessful_return_deliveries Q10
+CREATE OR REPLACE FUNCTION check_valid_unsuccessful_return_deliveries_time() RETURNS TRIGGER
+AS $$
+DECLARE
+  return_start_time TIMESTAMP;
+BEGIN
+  SELECT rl.start_time INTO return_start_time FROM return_legs rl WHERE rl.leg_id = NEW.leg_id AND rl.request_id = NEW.request_id;
+
+  IF (NEW.attempt_time <= return_start_time) THEN
+    RAISE EXCEPTION 'Attempt time for unsuccessful return deliveries cannot be earlier than return leg start time!';
+    RETURN NULL;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER check_valid_unsuccessful_return_deliveries_time_trigger
+BEFORE INSERT ON unsuccessful_return_deliveries
+FOR EACH ROW
+EXECUTE FUNCTION check_valid_unsuccessful_return_deliveries_time();
