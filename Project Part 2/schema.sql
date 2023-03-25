@@ -107,6 +107,7 @@ CREATE TABLE legs (
 	PRIMARY KEY (request_id, leg_id)
 );
 
+-- Must foreign key constraints be fully satistied? (request_id, leg_id) if leg_id does not exist
 CREATE TABLE unsuccessful_deliveries (
     request_id INTEGER,
     leg_id INTEGER,
