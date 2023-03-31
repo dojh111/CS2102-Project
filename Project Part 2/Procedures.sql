@@ -1,5 +1,6 @@
 -----------------------------------------------------------------------------------------------------------------------------------
 -- Procedure 1
+-- Check if trigger fires for this
 CREATE OR REPLACE PROCEDURE submit_request(
     customer_id INTEGER,
     evaluator_id INTEGER,
@@ -17,8 +18,9 @@ CREATE OR REPLACE PROCEDURE submit_request(
     content TEXT [],
     estimated_value NUMERIC []
   ) AS $$
-DECLARE i INTEGER;
-drid INTEGER;
+DECLARE 
+  i INTEGER;
+  drid INTEGER;
 BEGIN
 INSERT INTO delivery_requests(
     customer_id,
