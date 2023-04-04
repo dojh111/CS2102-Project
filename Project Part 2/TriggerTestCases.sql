@@ -446,6 +446,10 @@ INSERT INTO unsuccessful_deliveries VALUES(1, 1, 'Recipient not home', '2023-01-
 INSERT INTO legs VALUES(1, 1, 4, '2023-01-27 17:30:00', '2023-01-27 18:30:00', 1);
 INSERT INTO unsuccessful_deliveries VALUES(1, 1, 'Recipient not home', '2023-01-27 17:30:00');
 
+-- Test 4, invalid, leg id does not exist
+INSERT INTO legs VALUES(1, 1, 4, '2023-01-27 17:30:00', '2023-01-27 18:30:00', 1);
+INSERT INTO unsuccessful_deliveries VALUES(1, 4, 'Recipient not home', '2023-01-29 14:30:00');
+
 ------------------------------------------------------------------------------------------
 -- TESTS: Unsuccessful_deliveries related Q5 (Max 3 unsuccessful delivery for each delivery request)
 -- General Setup

@@ -24,6 +24,8 @@ EXECUTE FUNCTION check_at_least_one_package();
 -- Package related Q2
 -- On packages table, group by request id, then order by increasing, using cursor run 
 -- through each of this and check if its sequential, if its not sequential, throw error
+
+-- Need to reset prev_package_id = 0 when request_id changes, since we doing on entire table
 CREATE OR REPLACE FUNCTION check_if_package_sequential() RETURNS TRIGGER
 AS $$
 DECLARE
@@ -186,7 +188,7 @@ EXECUTE FUNCTION check_first_legs_timestamp();
 
 -----------------------------------------------------------------------------------------------------------------------------------
 -- Legs Related Q3
--- Test whether this works for empty unsuccessful tries
+-- Test whether this works for empty unsuccessful tries: Check if NULL if empty legs table
 CREATE OR REPLACE FUNCTION check_prev_legs_timestamp() RETURNS TRIGGER
 AS $$
 DECLARE
@@ -210,6 +212,7 @@ EXECUTE FUNCTION check_prev_legs_timestamp();
 
 -----------------------------------------------------------------------------------------------------------------------------------
 -- Unsuccessful_deliveries Related Q4
+-- Need test when leg_id or request_id of inserted does not exist in the table
 CREATE OR REPLACE FUNCTION check_unsuccessful_delivery_timestamp() RETURNS TRIGGER
 AS $$
 DECLARE
@@ -299,7 +302,8 @@ EXECUTE FUNCTION override_return_leg_id();
 
 -----------------------------------------------------------------------------------------------------------------------------------
 -- Return_legs Q8
--- Check that the trigger should go through if there is no cancellation requests
+-- Check that the trigger should go through if there is no cancellation request
+-- Need to add if leg_id = 1? SELECT MAX(l.end_time) instead?
 CREATE OR REPLACE FUNCTION check_valid_first_return_leg() RETURNS TRIGGER
 AS $$
 DECLARE
