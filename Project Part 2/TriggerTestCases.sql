@@ -57,6 +57,7 @@ INSERT INTO delivery_staff VALUES(2), (3), (4);
 COMMIT;
 
 -- Test 1: Valid
+-- Need to split the test case out??? CHECK WITH PROF WHAT IS HAPPENINGGGGGGG
 BEGIN TRANSACTION;
 INSERT INTO delivery_requests VALUES(1, 1, 1, 'submitted', 'start_addr', '987654', 'recp1', 'recp_addr', '456789', '2023-01-26 16:30:00', '2023-01-28', 4, 10.0);
 INSERT INTO packages VALUES(1, 1, 5.0, 5.0, 5.0, 2.5, 'artwork', 30.0, 5.0, 5.0, 5.0, 2.5);
@@ -148,7 +149,7 @@ INSERT INTO unsuccessful_pickups VALUES(1, 1, 3, '2023-01-28 17:30:00', 'Not hom
 INSERT INTO unsuccessful_pickups VALUES(1, 2, 3, '2023-01-29 17:30:00', 'Not home');
 INSERT INTO unsuccessful_pickups VALUES(2, 1, 3, '2023-03-22 17:30:00', 'Not home');
 INSERT INTO unsuccessful_pickups VALUES(2, 2, 3, '2023-03-23 17:30:00', 'Not home');
-COMMIT:
+COMMIT;
 
 -- Test 4: Invalid, not starting from 1 for id 1
 BEGIN TRANSACTION;
@@ -157,7 +158,7 @@ INSERT INTO unsuccessful_pickups VALUES(2, 2, 3, '2023-03-23 17:30:00', 'Not hom
 INSERT INTO unsuccessful_pickups VALUES(1, 4, 3, '2023-01-30 17:30:00', 'Not home');
 INSERT INTO unsuccessful_pickups VALUES(1, 2, 3, '2023-01-28 17:30:00', 'Not home');
 INSERT INTO unsuccessful_pickups VALUES(1, 3, 3, '2023-01-29 17:30:00', 'Not home');
-COMMIT:
+COMMIT;
 
 -- Test 5: Invalid, non consecutive (Test with and without transaction)
 BEGIN TRANSACTION;
@@ -170,7 +171,7 @@ BEGIN TRANSACTION;
 INSERT INTO unsuccessful_pickups VALUES(1, 0, 3, '2023-01-30 17:30:00', 'Not home');
 INSERT INTO unsuccessful_pickups VALUES(1, 1, 3, '2023-01-28 17:30:00', 'Not home');
 INSERT INTO unsuccessful_pickups VALUES(1, 2, 3, '2023-01-29 17:30:00', 'Not home');
-COMMIT:
+COMMIT;
 
 ------------------------------------------------------------------------------------------
 -- TESTS: Unsuccessful_pickups related Q4 - Timestamp of FIRST unsuccessful pickup > submission time for delivery request + new unsuccessful pickup > previous timestamp
@@ -417,7 +418,7 @@ INSERT INTO delivery_staff VALUES(2), (3), (4);
 
 INSERT INTO delivery_requests VALUES(1, 1, 1, 'accepted', 'start_addr', '987654', 'recp1', 'recp_addr', '456789', '2023-01-26 16:30:00', '2023-01-28', 4, 10.0);
 INSERT INTO packages VALUES(1, 1, 5.0, 5.0, 5.0, 2.5, 'artwork', 30.0, 5.0, 5.0, 5.0, 2.5);
-INSERT INTO delivery_requests VALUES(2, 2, 1, 'accepted', 'start_addr', '987654', 'recp1', 'recp_addr', '456789', '2023-03-20 16:30:00', '2023-03-23', 3, 25.0);
+INSERT INTO delivery_requests VALUES(2, 2, 1, 'accepted', 'start_addr', '987654', 'recp1', 'recp_addr', '456789', '2023-01-20 16:30:00', '2023-01-23', 3, 25.0);
 INSERT INTO packages VALUES(2, 1, 5.0, 5.0, 5.0, 2.5, 'lemons', 30.0, 5.0, 5.0, 5.0, 2.5);
 
 INSERT INTO accepted_requests VALUES(1, '123456789', '2023-01-26 17:30:00', 1);
@@ -464,7 +465,7 @@ INSERT INTO delivery_staff VALUES(2), (3), (4);
 
 INSERT INTO delivery_requests VALUES(1, 1, 1, 'accepted', 'start_addr', '987654', 'recp1', 'recp_addr', '456789', '2023-01-26 16:30:00', '2023-01-28', 4, 10.0);
 INSERT INTO packages VALUES(1, 1, 5.0, 5.0, 5.0, 2.5, 'artwork', 30.0, 5.0, 5.0, 5.0, 2.5);
-INSERT INTO delivery_requests VALUES(2, 2, 1, 'accepted', 'start_addr', '987654', 'recp1', 'recp_addr', '456789', '2023-03-20 16:30:00', '2023-03-23', 3, 25.0);
+INSERT INTO delivery_requests VALUES(2, 2, 1, 'accepted', 'start_addr', '987654', 'recp1', 'recp_addr', '456789', '2023-01-20 16:30:00', '2023-01-23', 3, 25.0);
 INSERT INTO packages VALUES(2, 1, 5.0, 5.0, 5.0, 2.5, 'lemons', 30.0, 5.0, 5.0, 5.0, 2.5);
 
 INSERT INTO accepted_requests VALUES(1, '123456789', '2023-01-26 17:30:00', 1);
@@ -576,12 +577,21 @@ INSERT INTO accepted_requests VALUES(2, '987654321', '2023-03-20 17:30:00', 1);
 INSERT INTO cancelled_or_unsuccessful_requests VALUES(1), (2);
 COMMIT;
 
+-- Test 0,  valid, not consecutive (Check start timestamp values after insertion)
+BEGIN TRANSACTION;
+INSERT INTO return_legs VALUES(2, 1, 3, '2023-01-28 16:30:00', 3, '2023-01-28 17:30:00');
+INSERT INTO return_legs VALUES(2, 2, 3, '2023-01-29 16:30:00', 3, '2023-01-29 17:30:00');
+INSERT INTO return_legs VALUES(2, 3, 3, '2023-01-30 16:30:00', 3, '2023-01-30 17:30:00');
+INSERT INTO return_legs VALUES(1, 1, 3, '2023-01-28 16:30:00', 3, '2023-01-28 17:30:00');
+INSERT INTO return_legs VALUES(1, 2, 3, '2023-01-29 16:30:00', 3, '2023-01-29 17:30:00');
+COMMIT;
+
 -- Test 1, valid
 INSERT INTO return_legs VALUES(1, 1, 3, '2023-01-28 16:30:00', 3, '2023-01-28 17:30:00');
 INSERT INTO return_legs VALUES(1, 2, 3, '2023-01-29 16:30:00', 3, '2023-01-29 17:30:00');
 INSERT INTO return_legs VALUES(1, 3, 3, '2023-01-30 16:30:00', 3, '2023-01-30 17:30:00');
 
--- Test 2, valid, transaction based (Check start timestamp values after insertion)
+-- Test 2, valid, not consecutive (Check start timestamp values after insertion)
 BEGIN TRANSACTION;
 INSERT INTO return_legs VALUES(2, 3, 3, '2023-01-30 16:30:00', 3, '2023-01-30 17:30:00');
 INSERT INTO return_legs VALUES(2, 1, 3, '2023-01-28 16:30:00', 3, '2023-01-28 17:30:00');
@@ -605,7 +615,7 @@ INSERT INTO return_legs VALUES(1, 1, 3, '2023-01-28 16:30:00', 3, '2023-01-28 17
 INSERT INTO return_legs VALUES(1, 2, 3, '2023-01-29 16:30:00', 3, '2023-01-29 17:30:00');
 INSERT INTO return_legs VALUES(1, 2, 3, '2023-01-30 16:30:00', 3, '2023-01-30 17:30:00');
 
--- Test 6, invalid, non consecutive wrong order, transaction (Check values after insertion)
+-- Test 6, valid, non consecutive wrong order, transaction (Check values after insertion)
 BEGIN TRANSACTION;
 INSERT INTO return_legs VALUES(1, 3, 3, '2023-01-28 16:30:00', 3, '2023-01-28 17:30:00');
 INSERT INTO return_legs VALUES(1, 1, 3, '2023-01-29 16:30:00', 3, '2023-01-29 17:30:00');
@@ -778,7 +788,7 @@ INSERT INTO return_legs VALUES(1, 1, 3, '2023-01-28 16:30:00', 3, '2023-01-28 17
 INSERT INTO return_legs VALUES(1, 2, 3, '2023-01-29 16:30:00', 3, '2023-01-29 17:30:00');
 INSERT INTO return_legs VALUES(1, 3, 3, '2023-01-30 16:30:00', 3, '2023-01-30 17:30:00');
 INSERT INTO unsuccessful_return_deliveries VALUES(1, 1, 'Failed return', '2023-01-28 17:35:00');
-INSERT INTO unsuccessful_return_deliveries VALUES(1, 2, 'Failed return', '2023-01-29 16:35:00'); -- Invalid time
+INSERT INTO unsuccessful_return_deliveries VALUES(1, 2, 'Failed return', '2023-01-29 16:25:00'); -- Invalid time
 INSERT INTO unsuccessful_return_deliveries VALUES(1, 3, 'Failed return', '2023-01-30 17:35:00');
 
 -- Test 3, invalid insertion, time == corresponding leg

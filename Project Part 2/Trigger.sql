@@ -29,26 +29,26 @@ EXECUTE FUNCTION check_at_least_one_package();
 CREATE OR REPLACE FUNCTION check_if_package_sequential() RETURNS TRIGGER
 AS $$
 DECLARE
-  curs CURSOR FOR (SELECT p.package_id, p.request_id FROM packages p GROUP BY p.request_id, p.package_id ORDER BY p.package_id ASC);
+  package_sequential_curs CURSOR FOR (SELECT p.package_id FROM packages p WHERE p.request_id = NEW.request_id ORDER BY p.package_id ASC);
   r RECORD;
   prev_package_id INTEGER;
 BEGIN
   prev_package_id = 0;
-  OPEN curs;
+  OPEN package_sequential_curs;
   
   LOOP
-    FETCH curs INTO r;
+    FETCH package_sequential_curs INTO r;
     EXIT WHEN NOT FOUND;
-    
+
     IF (r.package_id <> prev_package_id + 1) THEN
       RAISE EXCEPTION 'Package ID must be sequential!';
       RETURN NULL;
     END IF;
 
-    RETURN NULL;
     prev_package_id = r.package_id;
   END LOOP;
-  CLOSE curs;
+  CLOSE package_sequential_curs;
+  RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -63,15 +63,15 @@ EXECUTE FUNCTION check_if_package_sequential();
 CREATE OR REPLACE FUNCTION check_if_unsuccessful_sequential() RETURNS TRIGGER
 AS $$
 DECLARE
-  curs CURSOR FOR (SELECT up.pickup_id, up.request_id FROM unsuccessful_pickups up GROUP BY up.request_id, up.pickup_id ORDER BY up.pickup_id ASC);
+  pickup_curs CURSOR FOR (SELECT up.pickup_id FROM unsuccessful_pickups up WHERE up.request_id = NEW.request_id ORDER BY up.pickup_id ASC);
   r RECORD;
   prev_pickup_id INTEGER;
 BEGIN
   prev_pickup_id = 0;
-  OPEN curs;
+  OPEN pickup_curs;
   
   LOOP
-    FETCH curs INTO r;
+    FETCH pickup_curs INTO r;
     EXIT WHEN NOT FOUND;
     
     IF (r.pickup_id <> prev_pickup_id + 1) THEN
@@ -79,10 +79,10 @@ BEGIN
       RETURN NULL;
     END IF;
 
-    RETURN NULL;
     prev_pickup_id = r.pickup_id;
   END LOOP;
-  CLOSE curs;
+  CLOSE pickup_curs;
+  RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -100,8 +100,8 @@ DECLARE
   submission_time TIMESTAMP;
   previous_unsuccessful_time TIMESTAMP;
 BEGIN
-  SELECT dr.submission_time FROM delivery_requests dr WHERE dr.id = NEW.id INTO submission_time;
-  SELECT MAX(up.previous_unsuccessful_time) FROM unsuccessful_pickups up WHERE up.request_id = NEW.id INTO previous_unsuccessful_time;
+  SELECT dr.submission_time INTO submission_time FROM delivery_requests dr WHERE dr.id = NEW.request_id;
+  SELECT MAX(up.pickup_time) INTO previous_unsuccessful_time FROM unsuccessful_pickups up WHERE up.request_id = NEW.request_id;
 
   IF (submission_time >= NEW.pickup_time) THEN
     RAISE EXCEPTION 'Unsuccessful Pickup time must be later than submission time!';
@@ -112,10 +112,12 @@ BEGIN
     RAISE EXCEPTION 'Unsuccessful Pickup time must be later than previous pickup time!';
     RETURN NULL;
   END IF;
+
+  RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE CONSTRAINT TRIGGER check_if_unsuccessful_sequential_timestamp_trigger
+CREATE TRIGGER check_if_unsuccessful_sequential_timestamp_trigger
 BEFORE INSERT ON unsuccessful_pickups
 FOR EACH ROW
 EXECUTE FUNCTION check_if_unsuccessful_sequential_timestamp();
@@ -125,15 +127,15 @@ EXECUTE FUNCTION check_if_unsuccessful_sequential_timestamp();
 CREATE OR REPLACE FUNCTION check_if_leg_sequential() RETURNS TRIGGER
 AS $$
 DECLARE
-  curs CURSOR FOR (SELECT l.leg_id, l.request_id FROM legs l GROUP BY l.request_id, l.leg_id ORDER BY l.leg_id ASC);
+  leg_curs CURSOR FOR (SELECT l.leg_id FROM legs l WHERE l.request_id = NEW.request_id ORDER BY l.leg_id ASC);
   r RECORD;
   prev_leg_id INTEGER;
 BEGIN
   prev_leg_id = 0;
-  OPEN curs;
+  OPEN leg_curs;
   
   LOOP
-    FETCH curs INTO r;
+    FETCH leg_curs INTO r;
     EXIT WHEN NOT FOUND;
     
     IF (r.leg_id <> prev_leg_id + 1) THEN
@@ -141,10 +143,10 @@ BEGIN
       RETURN NULL;
     END IF;
 
-    RETURN NULL;
     prev_leg_id = r.leg_id;
   END LOOP;
-  CLOSE curs;
+  CLOSE leg_curs;
+  RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -164,7 +166,7 @@ DECLARE
   previous_unsuccessful_time TIMESTAMP;
 BEGIN
   SELECT dr.submission_time FROM delivery_requests dr WHERE dr.id = NEW.request_id INTO submission_time;
-  SELECT MAX(up.previous_unsuccessful_time) FROM unsuccessful_pickups up WHERE up.request_id = NEW.request_id INTO previous_unsuccessful_time;
+  SELECT MAX(up.pickup_time) FROM unsuccessful_pickups up WHERE up.request_id = NEW.request_id INTO previous_unsuccessful_time;
 
   IF (NEW.start_time <= submission_time) THEN
     RAISE EXCEPTION 'First legs start time must be later than submission time!';
@@ -180,7 +182,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE CONSTRAINT TRIGGER check_first_leg_timestamp_trigger
+CREATE TRIGGER check_first_leg_timestamp_trigger
 BEFORE INSERT ON legs
 FOR EACH ROW
 WHEN (NEW.leg_id = 1)
@@ -193,10 +195,12 @@ CREATE OR REPLACE FUNCTION check_prev_legs_timestamp() RETURNS TRIGGER
 AS $$
 DECLARE
   prev_legs_end_time TIMESTAMP;
+  num_rows INTEGER;
 BEGIN
-  SELECT l.end_time FROM legs l WHERE l.request_id = NEW.request_id ORDER BY l.leg_id DESC LIMIT 1 INTO prev_legs_end_time;
+  SELECT l.end_time INTO prev_legs_end_time FROM legs l WHERE l.request_id = NEW.request_id ORDER BY l.leg_id DESC LIMIT 1;
+  SELECT COUNT(*) INTO num_rows FROM legs l WHERE l.request_id = NEW.request_id;
 
-  IF (prev_legs_end_time IS NULL OR NEW.start_time <= prev_legs_end_time) THEN
+  IF (num_rows > 0 AND (prev_legs_end_time IS NULL OR NEW.start_time <= prev_legs_end_time)) THEN
     RAISE EXCEPTION 'Legs start time must be later than previous leg end time and it cannot be NULL!';
     RETURN NULL;
   END IF;
@@ -205,7 +209,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE CONSTRAINT TRIGGER check_prev_legs_timestamp_trigger
+CREATE TRIGGER check_prev_legs_timestamp_trigger
 BEFORE INSERT ON legs
 FOR EACH ROW
 EXECUTE FUNCTION check_prev_legs_timestamp();
@@ -229,7 +233,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE CONSTRAINT TRIGGER check_unsuccessful_delivery_timestamp_trigger
+CREATE TRIGGER check_unsuccessful_delivery_timestamp_trigger
 BEFORE INSERT ON unsuccessful_deliveries
 FOR EACH ROW
 EXECUTE FUNCTION check_unsuccessful_delivery_timestamp();
@@ -253,7 +257,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE CONSTRAINT TRIGGER check_max_ud_limit_trigger
+CREATE TRIGGER check_max_ud_limit_trigger
 BEFORE INSERT ON unsuccessful_deliveries
 FOR EACH ROW
 EXECUTE FUNCTION check_max_ud_limit();
@@ -276,7 +280,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE CONSTRAINT TRIGGER check_valid_cancellation_time_trigger
+CREATE TRIGGER check_valid_cancellation_time_trigger
 BEFORE INSERT ON cancelled_requests
 FOR EACH ROW
 EXECUTE FUNCTION check_valid_cancellation_time();
@@ -287,16 +291,32 @@ EXECUTE FUNCTION check_valid_cancellation_time();
 CREATE OR REPLACE FUNCTION override_return_leg_id() RETURNS TRIGGER
 AS $$
 DECLARE
-  leg_count INTEGER;
+  return_leg_curs CURSOR FOR (SELECT rl.leg_id FROM return_legs rl WHERE rl.request_id = NEW.request_id ORDER BY rl.leg_id ASC);
+  r RECORD;
+  prev_return_leg_id INTEGER;
 BEGIN
-  SELECT COUNT(*) FROM return_legs rl WHERE rl.request_id = NEW.request_id INTO leg_count;
-  NEW.leg_id = leg_count + 1;
-  RETURN NEW;
+  prev_return_leg_id = 0;
+  OPEN return_leg_curs;
+  
+  LOOP
+    FETCH return_leg_curs INTO r;
+    EXIT WHEN NOT FOUND;
+    
+    IF (r.leg_id <> prev_return_leg_id + 1) THEN
+      RAISE EXCEPTION 'Return Leg ID must be sequential!';
+      RETURN NULL;
+    END IF;
+
+    prev_return_leg_id = r.leg_id;
+  END LOOP;
+  CLOSE return_leg_curs;
+  RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
 CREATE CONSTRAINT TRIGGER override_return_leg_id_trigger
-BEFORE INSERT ON return_legs
+AFTER INSERT ON return_legs
+DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW
 EXECUTE FUNCTION override_return_leg_id();
 
@@ -311,8 +331,8 @@ DECLARE
   last_leg_end_time TIMESTAMP;
   cancelled_time TIMESTAMP;
 BEGIN
-  SELECT COUNT(*) INTO last_leg_count FROM legs l WHERE l.request_id = NEW.reqest_id;
-  SELECT l.end_time INTO last_leg_end_time FROM legs l WHERE l.request_id = NEW.request_id;
+  SELECT COUNT(*) INTO last_leg_count FROM legs l WHERE l.request_id = NEW.request_id;
+  SELECT l.end_time INTO last_leg_end_time FROM legs l WHERE l.request_id = NEW.request_id ORDER BY l.leg_id DESC LIMIT 1;
   SELECT cr.cancel_time INTO cancelled_time FROM cancelled_requests cr WHERE cr.id = NEW.request_id;
 
   IF (last_leg_count < 1) THEN
@@ -320,12 +340,12 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  IF (last_leg_end_time IS NULL OR last_leg_end_time > NEW.start_time) THEN
+  IF (last_leg_end_time IS NULL OR last_leg_end_time >= NEW.start_time) THEN
     RAISE EXCEPTION 'The start time of return leg cannot be earlier than the end time of the last leg!';
     RETURN NULL;
   END IF;
 
-  IF (cancelled_time < NEW.start_time) then
+  IF (cancelled_time >= NEW.start_time) then
     RAISE EXCEPTION 'The start time of return leg cannot be earlier than the cancellation time!';
     RETURN NULL;
   END IF;
@@ -334,9 +354,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE CONSTRAINT TRIGGER check_valid_first_return_leg_trigger
+CREATE TRIGGER check_valid_first_return_leg_trigger
 BEFORE INSERT ON return_legs
 FOR EACH ROW
+WHEN (NEW.leg_id = 1)
 EXECUTE FUNCTION check_valid_first_return_leg();
 
 -----------------------------------------------------------------------------------------------------------------------------------
@@ -357,7 +378,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE CONSTRAINT TRIGGER check_max_unsuccessful_return_deliveries_trigger
+CREATE TRIGGER check_max_unsuccessful_return_deliveries_trigger
 BEFORE INSERT ON unsuccessful_return_deliveries
 FOR EACH ROW
 EXECUTE FUNCTION check_max_unsuccessful_return_deliveries();
@@ -380,7 +401,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE CONSTRAINT TRIGGER check_valid_unsuccessful_return_deliveries_time_trigger
+CREATE TRIGGER check_valid_unsuccessful_return_deliveries_time_trigger
 BEFORE INSERT ON unsuccessful_return_deliveries
 FOR EACH ROW
 EXECUTE FUNCTION check_valid_unsuccessful_return_deliveries_time();
