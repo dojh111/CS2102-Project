@@ -186,9 +186,10 @@ CREATE OR REPLACE PROCEDURE insert_leg(
     destination_facility INTEGER
   ) AS $$
 DECLARE
+  old_request_id INTEGER = request_id;
   max_leg_id INTEGER;
 BEGIN
-  SELECT COUNT(l.leg_id) INTO max_leg_id FROM legs l WHERE l.request_id = request_id;
+  SELECT COUNT(l.leg_id) INTO max_leg_id FROM legs l WHERE l.request_id = old_request_id;
 
   INSERT INTO legs(
       request_id,

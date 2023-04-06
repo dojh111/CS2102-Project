@@ -68,7 +68,58 @@ FROM (
     GROUP BY rl.handler_id
   ) AS T1
 GROUP BY T1.employee_id
-ORDER BY SUM(num) DESC, T1.employee_id ASC -- CHECK THISSS
+ORDER BY SUM(num) DESC, T1.employee_id ASC
+LIMIT k;
+$$ LANGUAGE sql;
+
+
+-----------------------------------------------------------------------------------------------------------------------------------
+-- Function 2
+CREATE OR REPLACE FUNCTION get_top_delivery_persons(IN k INTEGER)
+RETURNS TABLE (employee_id INTEGER) AS $$
+SELECT T3.employee_id AS employee_id
+FROM (
+  SELECT T2.id AS employee_id, 0 AS num 
+  FROM (
+    SELECT ds.id AS id 
+    FROM delivery_staff ds
+    EXCEPT 
+    SELECT DISTINCT T1.employee_id AS id
+    FROM (
+        SELECT l.handler_id AS employee_id,
+          COUNT(*) AS num
+        FROM legs l
+        GROUP BY l.handler_id
+        UNION ALL
+        SELECT up.handler_id AS employee_id,
+          COUNT(*) AS num
+        FROM unsuccessful_pickups up
+        GROUP BY up.handler_id
+        UNION ALL
+        SELECT rl.handler_id AS employee_id,
+          COUNT(*) AS num
+        FROM return_legs rl
+        GROUP BY rl.handler_id
+      ) AS T1
+  ) AS T2
+  UNION ALL
+  SELECT l.handler_id AS employee_id,
+    COUNT(*) AS num
+  FROM legs l
+  GROUP BY l.handler_id
+  UNION ALL
+  SELECT up.handler_id AS employee_id,
+    COUNT(*) AS num
+  FROM unsuccessful_pickups up
+  GROUP BY up.handler_id
+  UNION ALL
+  SELECT rl.handler_id AS employee_id,
+    COUNT(*) AS num
+  FROM return_legs rl
+  GROUP BY rl.handler_id
+) AS T3
+GROUP BY T3.employee_id
+ORDER BY SUM(num) DESC, T3.employee_id ASC
 LIMIT k;
 $$ LANGUAGE sql;
 
