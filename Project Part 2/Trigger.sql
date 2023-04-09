@@ -288,7 +288,7 @@ EXECUTE FUNCTION check_valid_cancellation_time();
 -----------------------------------------------------------------------------------------------------------------------------------
 -- Return_legs Q7
 -- Check this with prof: Does this question mean overriding the the return_leg id or just throwing exception when the return_id is not valid?
-CREATE OR REPLACE FUNCTION override_return_leg_id() RETURNS TRIGGER
+CREATE OR REPLACE FUNCTION check_if_return_leg_sequential() RETURNS TRIGGER
 AS $$
 DECLARE
   return_leg_curs CURSOR FOR (SELECT rl.leg_id FROM return_legs rl WHERE rl.request_id = NEW.request_id ORDER BY rl.leg_id ASC);
@@ -314,11 +314,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE CONSTRAINT TRIGGER override_return_leg_id_trigger
+CREATE CONSTRAINT TRIGGER check_if_return_leg_sequential_trigger
 AFTER INSERT ON return_legs
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW
-EXECUTE FUNCTION override_return_leg_id();
+EXECUTE FUNCTION check_if_return_leg_sequential();
 
 -----------------------------------------------------------------------------------------------------------------------------------
 -- Return_legs Q8
