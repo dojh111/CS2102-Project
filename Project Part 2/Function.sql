@@ -59,34 +59,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
------------------------------------------------------------------------------------------------------------------------------------
--- Function 2
-CREATE OR REPLACE FUNCTION get_top_delivery_persons(IN k INTEGER)
-RETURNS TABLE (employee_id INTEGER) AS $$
-SELECT T1.employee_id
-FROM (
-    SELECT l.handler_id AS employee_id,
-      COUNT(*) AS num
-    FROM legs l
-    GROUP BY l.handler_id
-    UNION ALL
-    SELECT up.handler_id AS employee_id,
-      COUNT(*) AS num
-    FROM unsuccessful_pickups up
-    GROUP BY up.handler_id
-    UNION ALL
-    SELECT rl.handler_id AS employee_id,
-      COUNT(*) AS num
-    FROM return_legs rl
-    GROUP BY rl.handler_id
-  ) AS T1
-GROUP BY T1.employee_id
-ORDER BY SUM(num) DESC, T1.employee_id ASC
-LIMIT k;
-$$ LANGUAGE sql;
-
-
 -----------------------------------------------------------------------------------------------------------------------------------
 -- Function 2
 CREATE OR REPLACE FUNCTION get_top_delivery_persons(IN k INTEGER)
