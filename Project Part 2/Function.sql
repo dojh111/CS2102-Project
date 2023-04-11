@@ -11,9 +11,12 @@ DECLARE
   drid INTEGER = request_id;
   leg_curs CURSOR FOR (SELECT * FROM legs l WHERE l.request_id = drid ORDER BY l.start_time ASC);
   return_curs CURSOR FOR (SELECT * FROM return_legs rl WHERE rl.request_id = drid ORDER BY rl.start_time ASC);
+  return_count INTEGER;
   r RECORD;
   prev_addr TEXT;
+  next_dest_r TEXT;
 BEGIN 
+  -- Previous address is initialised as the customer address
   prev_addr := (SELECT dr.pickup_addr FROM delivery_requests dr WHERE dr.id = drid);
   
   OPEN leg_curs;
@@ -22,7 +25,11 @@ BEGIN
     EXIT WHEN NOT FOUND; 
     
     source_addr := prev_addr;
-    destination_addr := (SELECT f.address FROM facilities f WHERE f.id = r.destination_facility);
+    IF (r.destination_facility IS NULL) THEN
+      destination_addr := (SELECT dr.recipient_addr FROM delivery_requests dr WHERE dr.id = drid);
+    ELSE
+      destination_addr := (SELECT f.address FROM facilities f WHERE f.id = r.destination_facility);
+    END IF;
     start_time := r.start_time;
     end_time := r.end_time;
     prev_addr := destination_addr;
@@ -31,20 +38,27 @@ BEGIN
   CLOSE leg_curs;
 
   OPEN return_curs;
-  LOOP 
+  LOOP
     FETCH return_curs into r;
     EXIT WHEN NOT FOUND; 
     
-    source_addr := prev_addr;
-    destination_addr := (SELECT f.address FROM facilities f WHERE f.id = r.source_facility);
+    source_addr := (SELECT f.address FROM facilities f WHERE f.id = r.source_facility);
+    next_dest_r := (SELECT f.address FROM facilities f WHERE f.id = (SELECT rl.source_facility FROM return_legs rl WHERE rl.leg_id = r.leg_id + 1));
+
+    IF (next_dest_r IS NULL) THEN
+      destination_addr := (SELECT dr.pickup_addr FROM delivery_requests dr WHERE dr.id = drid);
+    ELSE 
+      destination_addr := next_dest_r;
+    END IF;
+    
     start_time := r.start_time;
     end_time := r.end_time;
-    prev_addr := destination_addr;
     RETURN NEXT; 
   END LOOP;
   CLOSE return_curs;
 END;
 $$ LANGUAGE plpgsql;
+
 
 -----------------------------------------------------------------------------------------------------------------------------------
 -- Function 2
