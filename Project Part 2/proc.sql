@@ -22,10 +22,6 @@ EXECUTE FUNCTION check_at_least_one_package();
 
 -----------------------------------------------------------------------------------------------------------------------------------
 -- Package related Q2
--- On packages table, group by request id, then order by increasing, using cursor run 
--- through each of this and check if its sequential, if its not sequential, throw error
-
--- Need to reset prev_package_id = 0 when request_id changes, since we doing on entire table
 CREATE OR REPLACE FUNCTION check_if_package_sequential() RETURNS TRIGGER
 AS $$
 DECLARE
@@ -158,7 +154,6 @@ EXECUTE FUNCTION check_if_leg_sequential();
 
 -----------------------------------------------------------------------------------------------------------------------------------
 -- Legs Related Q2
--- Test whether this works for empty unsuccessful tries
 CREATE OR REPLACE FUNCTION check_first_legs_timestamp() RETURNS TRIGGER
 AS $$
 DECLARE
@@ -190,7 +185,6 @@ EXECUTE FUNCTION check_first_legs_timestamp();
 
 -----------------------------------------------------------------------------------------------------------------------------------
 -- Legs Related Q3
--- Test whether this works for empty unsuccessful tries: Check if NULL if empty legs table
 CREATE OR REPLACE FUNCTION check_prev_legs_timestamp() RETURNS TRIGGER
 AS $$
 DECLARE
@@ -216,7 +210,6 @@ EXECUTE FUNCTION check_prev_legs_timestamp();
 
 -----------------------------------------------------------------------------------------------------------------------------------
 -- Unsuccessful_deliveries Related Q4
--- Need test when leg_id or request_id of inserted does not exist in the table
 CREATE OR REPLACE FUNCTION check_unsuccessful_delivery_timestamp() RETURNS TRIGGER
 AS $$
 DECLARE
@@ -240,7 +233,6 @@ EXECUTE FUNCTION check_unsuccessful_delivery_timestamp();
 
 -----------------------------------------------------------------------------------------------------------------------------------
 -- Unsuccessful_deliveries Related Q5
--- Test this statement out INSERT INTO ud VALUES (1), (2), (3), (4)
 CREATE OR REPLACE FUNCTION check_max_ud_limit() RETURNS TRIGGER
 AS $$
 DECLARE
@@ -287,7 +279,6 @@ EXECUTE FUNCTION check_valid_cancellation_time();
 
 -----------------------------------------------------------------------------------------------------------------------------------
 -- Return_legs Q7
--- Check this with prof: Does this question mean overriding the the return_leg id or just throwing exception when the return_id is not valid?
 CREATE OR REPLACE FUNCTION check_if_return_leg_sequential() RETURNS TRIGGER
 AS $$
 DECLARE
@@ -322,8 +313,6 @@ EXECUTE FUNCTION check_if_return_leg_sequential();
 
 -----------------------------------------------------------------------------------------------------------------------------------
 -- Return_legs Q8
--- Check that the trigger should go through if there is no cancellation request
--- Need to add if leg_id = 1? SELECT MAX(l.end_time) instead?
 CREATE OR REPLACE FUNCTION check_valid_first_return_leg() RETURNS TRIGGER
 AS $$
 DECLARE
@@ -405,3 +394,357 @@ CREATE TRIGGER check_valid_unsuccessful_return_deliveries_time_trigger
 BEFORE INSERT ON unsuccessful_return_deliveries
 FOR EACH ROW
 EXECUTE FUNCTION check_valid_unsuccessful_return_deliveries_time();
+
+-----------------------------------------------------------------------------------------------------------------------------------
+-- Procedure 1
+CREATE OR REPLACE PROCEDURE submit_request(
+    customer_id INTEGER,
+    evaluator_id INTEGER,
+    pickup_addr TEXT,
+    pickup_postal TEXT,
+    recipient_name TEXT,
+    recipient_addr TEXT,
+    recipient_postal TEXT,
+    submission_time TIMESTAMP,
+    package_num INTEGER,
+    reported_height INTEGER [],
+    reported_width INTEGER [],
+    reported_depth INTEGER [],
+    reported_weight INTEGER [],
+    content TEXT [],
+    estimated_value NUMERIC []
+  ) AS $$
+DECLARE 
+  i INTEGER;
+  drid INTEGER;
+BEGIN
+INSERT INTO delivery_requests(
+    customer_id,
+    evaluater_id,
+    status,
+    pickup_addr,
+    pickup_postal,
+    recipient_name,
+    recipient_addr,
+    recipient_postal,
+    submission_time,
+    pickup_date,
+    num_days_needed,
+    price
+  )
+VALUES (
+    customer_id,
+    evaluator_id,
+    'submitted',
+    pickup_addr,
+    pickup_postal,
+    recipient_name,
+    recipient_addr,
+    recipient_postal,
+    submission_time,
+    NULL,
+    NULL,
+    NULL
+  );
+
+SELECT dr.id INTO drid FROM delivery_requests dr ORDER BY dr.id DESC LIMIT 1;
+
+i := 1;
+WHILE i <= package_num LOOP
+INSERT INTO packages(
+    request_id,
+    package_id,
+    reported_height,
+    reported_width,
+    reported_depth,
+    reported_weight,
+    content,
+    estimated_value,
+    actual_height,
+    actual_width,
+    actual_depth,
+    actual_weight
+  )
+VALUES(
+    drid,
+    i,
+    reported_height [i],
+    reported_width [i],
+    reported_depth [i],
+    reported_weight [i],
+    content [i],
+    estimated_value [i],
+    NULL,
+    NULL,
+    NULL,
+    NULL
+  );
+i := i + 1;
+END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+-----------------------------------------------------------------------------------------------------------------------------------
+-- Procedure 2
+CREATE OR REPLACE PROCEDURE resubmit_request(
+    request_id INTEGER,
+    evaluator_id INTEGER,
+    submission_time TIMESTAMP,
+    reported_height INTEGER [],
+    reported_width INTEGER [],
+    reported_depth INTEGER [],
+    reported_weight INTEGER []
+  ) AS $$
+DECLARE 
+  old_request_id INTEGER = request_id;
+  package_curs CURSOR FOR (SELECT * FROM packages p WHERE p.request_id = old_request_id ORDER BY package_id ASC);
+  r RECORD;
+  dr RECORD;
+  new_drid INTEGER;
+BEGIN
+  SELECT * FROM delivery_requests d WHERE d.id = request_id INTO dr;
+
+  INSERT INTO delivery_requests(
+      customer_id,
+      evaluater_id,
+      status,
+      pickup_addr,
+      pickup_postal,
+      recipient_name,
+      recipient_addr,
+      recipient_postal,
+      submission_time,
+      pickup_date,
+      num_days_needed,
+      price
+    )
+  VALUES (
+      dr.customer_id,
+      evaluator_id,
+      'submitted',
+      dr.pickup_addr,
+      dr.pickup_postal,
+      dr.recipient_name,
+      dr.recipient_addr,
+      dr.recipient_postal,
+      submission_time,
+      NULL,
+      NULL,
+      NULL
+    );
+
+  SELECT dr1.id INTO new_drid FROM delivery_requests dr1 ORDER BY dr1.id DESC LIMIT 1;
+
+  OPEN package_curs;  
+  LOOP
+    FETCH package_curs INTO r;
+    EXIT WHEN NOT FOUND;
+    
+    INSERT INTO packages(
+      request_id,
+      package_id,
+      reported_height,
+      reported_width,
+      reported_depth,
+      reported_weight,
+      content,
+      estimated_value,
+      actual_height,
+      actual_width,
+      actual_depth,
+      actual_weight
+    )
+    VALUES(
+      new_drid,
+      r.package_id,
+      reported_height[r.package_id],
+      reported_width[r.package_id],
+      reported_depth[r.package_id],
+      reported_weight[r.package_id],
+      r.content,
+      r.estimated_value,
+      NULL,
+      NULL,
+      NULL,
+      NULL
+    );
+  END LOOP;
+  CLOSE package_curs;
+END;
+$$ LANGUAGE plpgsql;
+
+-----------------------------------------------------------------------------------------------------------------------------------
+-- Procedure 3
+CREATE OR REPLACE PROCEDURE insert_leg(
+    request_id INTEGER,
+    handler_id INTEGER,
+    start_time TIMESTAMP,
+    destination_facility INTEGER
+  ) AS $$
+DECLARE
+  old_request_id INTEGER = request_id;
+  max_leg_id INTEGER;
+BEGIN
+  SELECT COUNT(l.leg_id) INTO max_leg_id FROM legs l WHERE l.request_id = old_request_id;
+
+  INSERT INTO legs(
+      request_id,
+      leg_id,
+      handler_id,
+      start_time,
+      end_time,
+      destination_facility
+    )
+  VALUES (
+      request_id,
+      max_leg_id + 1,
+      handler_id,
+      start_time,
+      NULL,
+      destination_facility
+    );
+END;
+$$ LANGUAGE plpgsql;
+
+-----------------------------------------------------------------------------------------------------------------------------------
+-- Function 1
+CREATE OR REPLACE FUNCTION view_trajectory(IN request_id INTEGER) 
+RETURNS TABLE (
+    source_addr TEXT,
+    destination_addr TEXT,
+    start_time TIMESTAMP,
+    end_time TIMESTAMP
+  ) AS $$
+DECLARE
+  drid INTEGER = request_id;
+  leg_curs CURSOR FOR (SELECT * FROM legs l WHERE l.request_id = drid ORDER BY l.start_time ASC);
+  return_curs CURSOR FOR (SELECT * FROM return_legs rl WHERE rl.request_id = drid ORDER BY rl.start_time ASC);
+  return_count INTEGER;
+  r RECORD;
+  prev_addr TEXT;
+  next_dest_r TEXT;
+BEGIN 
+  prev_addr := (SELECT dr.pickup_addr FROM delivery_requests dr WHERE dr.id = drid);
+  
+  OPEN leg_curs;
+  LOOP 
+    FETCH leg_curs into r;
+    EXIT WHEN NOT FOUND; 
+    
+    source_addr := prev_addr;
+    IF (r.destination_facility IS NULL) THEN
+      destination_addr := (SELECT dr.recipient_addr FROM delivery_requests dr WHERE dr.id = drid);
+    ELSE
+      destination_addr := (SELECT f.address FROM facilities f WHERE f.id = r.destination_facility);
+    END IF;
+    start_time := r.start_time;
+    end_time := r.end_time;
+    prev_addr := destination_addr;
+    RETURN NEXT;    
+  END LOOP;
+  CLOSE leg_curs;
+
+  OPEN return_curs;
+  LOOP
+    FETCH return_curs into r;
+    EXIT WHEN NOT FOUND; 
+    
+    source_addr := (SELECT f.address FROM facilities f WHERE f.id = r.source_facility);
+    next_dest_r := (SELECT f.address FROM facilities f WHERE f.id = (SELECT rl.source_facility FROM return_legs rl WHERE rl.leg_id = r.leg_id + 1));
+
+    IF (next_dest_r IS NULL) THEN
+      destination_addr := (SELECT dr.pickup_addr FROM delivery_requests dr WHERE dr.id = drid);
+    ELSE 
+      destination_addr := next_dest_r;
+    END IF;
+    
+    start_time := r.start_time;
+    end_time := r.end_time;
+    RETURN NEXT; 
+  END LOOP;
+  CLOSE return_curs;
+END;
+$$ LANGUAGE plpgsql;
+
+-----------------------------------------------------------------------------------------------------------------------------------
+-- Function 2
+CREATE OR REPLACE FUNCTION get_top_delivery_persons(IN k INTEGER)
+RETURNS TABLE (employee_id INTEGER) AS $$
+SELECT T3.employee_id AS employee_id
+FROM (
+  SELECT T2.id AS employee_id, 0 AS num 
+  FROM (
+    SELECT ds.id AS id 
+    FROM delivery_staff ds
+    EXCEPT 
+    SELECT DISTINCT T1.employee_id AS id
+    FROM (
+        SELECT l.handler_id AS employee_id,
+          COUNT(*) AS num
+        FROM legs l
+        GROUP BY l.handler_id
+        UNION ALL
+        SELECT up.handler_id AS employee_id,
+          COUNT(*) AS num
+        FROM unsuccessful_pickups up
+        GROUP BY up.handler_id
+        UNION ALL
+        SELECT rl.handler_id AS employee_id,
+          COUNT(*) AS num
+        FROM return_legs rl
+        GROUP BY rl.handler_id
+      ) AS T1
+  ) AS T2
+  UNION ALL
+  SELECT l.handler_id AS employee_id,
+    COUNT(*) AS num
+  FROM legs l
+  GROUP BY l.handler_id
+  UNION ALL
+  SELECT up.handler_id AS employee_id,
+    COUNT(*) AS num
+  FROM unsuccessful_pickups up
+  GROUP BY up.handler_id
+  UNION ALL
+  SELECT rl.handler_id AS employee_id,
+    COUNT(*) AS num
+  FROM return_legs rl
+  GROUP BY rl.handler_id
+) AS T3
+GROUP BY T3.employee_id
+ORDER BY SUM(num) DESC, T3.employee_id ASC
+LIMIT k;
+$$ LANGUAGE sql;
+
+-----------------------------------------------------------------------------------------------------------------------------------
+-- Function 3
+CREATE OR REPLACE FUNCTION get_top_connections(IN k INTEGER) RETURNS TABLE (
+    source_facility_id INTEGER,
+    destination_facility_id INTEGER
+  ) AS $$
+SELECT T1.source AS source_facility_id,
+  T1.destination AS destination_facility_id
+FROM (
+    SELECT l1.destination_facility AS source,
+      l2.destination_facility AS destination
+    FROM legs l1
+      JOIN legs l2 ON (
+        l2.leg_id = l1.leg_id + 1
+        AND l1.request_id = l2.request_id
+      )
+    WHERE l1.destination_facility IS NOT NULL
+      AND l2.destination_facility IS NOT NULL
+    UNION ALL
+    SELECT rl1.source_facility AS source,
+      rl2.source_facility AS destination
+    FROM return_legs rl1
+      JOIN return_legs rl2 ON (
+        rl2.leg_id = rl1.leg_id + 1
+        AND rl1.request_id = rl2.request_id
+      )
+  ) AS T1
+GROUP BY (T1.source, T1.destination)
+ORDER BY COUNT(*) DESC,
+  (T1.source, T1.destination) ASC
+LIMIT k;
+$$ LANGUAGE sql;
