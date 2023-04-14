@@ -650,7 +650,7 @@ BEGIN
     EXIT WHEN NOT FOUND; 
     
     source_addr := (SELECT f.address FROM facilities f WHERE f.id = r.source_facility);
-    next_dest_r := (SELECT f.address FROM facilities f WHERE f.id = (SELECT rl.source_facility FROM return_legs rl WHERE rl.leg_id = r.leg_id + 1));
+    next_dest_r := (SELECT f.address FROM facilities f WHERE f.id = (SELECT rl.source_facility FROM return_legs rl WHERE (rl.leg_id = r.leg_id + 1) AND (rl.request_id = drid)));
 
     IF (next_dest_r IS NULL) THEN
       destination_addr := (SELECT dr.pickup_addr FROM delivery_requests dr WHERE dr.id = drid);
