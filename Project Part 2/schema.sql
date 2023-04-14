@@ -1,3 +1,6 @@
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
+
 CREATE TYPE gender_type AS ENUM (
 	'male',
 	'female'
